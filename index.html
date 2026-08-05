@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Monitor de Testes — Retardante de Chamas</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js" defer></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+  :root {
+    --bg: #1E1B17;
+    --panel: #2B2620;
+    --ink: #F3EEE3;
+    --muted: #9A9186;
+    --amber: #FF9640;
+    --teal: #46B39D;
+    --red: #E5533D;
+    --line: #443C32;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    background-image:
+      linear-gradient(var(--line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--line) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  #app { max-width: 1100px; margin: 0 auto; padding: 16px; }
+
+  .topbar {
+    display: flex; align-items: center; justify-content: space-between;
+    border: 1px solid var(--line); background: var(--panel); border-radius: 4px;
+    padding: 14px 18px; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;
+  }
+  .marca { display: flex; align-items: center; gap: 10px; }
+  .marca h1 { font-family: 'Oswald', sans-serif; text-transform: uppercase; letter-spacing: .05em; font-size: 16px; margin: 0; }
+  .subtitulo { color: var(--muted); font-size: 12px; margin: 2px 0 0; }
+  .status { display: flex; align-items: center; gap: 6px; font-size: 11px; color: var(--muted); }
+  .led { width: 8px; height: 8px; border-radius: 50%; background: var(--teal); box-shadow: 0 0 6px 2px rgba(70,179,157,.6); animation: pulso 2.2s ease-in-out infinite; }
+  @keyframes pulso { 0%,100% { opacity: 1; } 50% { opacity: .45; } }
+  @media (prefers-reduced-motion: reduce) { .led { animation: none; } }
+
+  .cartao { border: 1px solid var(--line); background: var(--panel); border-radius: 4px; padding: 18px; }
+  .cartao-estreito { max-width: 380px; margin: 40px auto; }
+  .rotulo-painel { font-size: 11px; color: var(--amber); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 14px; display: flex; align-items: center; gap: 6px; }
+  .rotulo-painel::before { content: ""; width: 14px; height: 1px; background: var(--amber); }
+  .texto-auxiliar { color: var(--muted); font-size: 12.5px; line-height: 1.5; margin: 0 0 14px; }
+
+  .campo { margin-bottom: 12px; }
+  .campo label { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 5px; }
+  .campo input, .campo textarea {
+    width: 100%; background: var(--bg); border: 1px solid var(--line); color: var(--ink);
+    padding: 10px; border-radius: 3px; font-family: 'IBM Plex Mono', monospace; font-size: 14px;
+  }
+  .campo textarea { font-family: 'IBM Plex Sans', sans-serif; min-height: 50px; resize: vertical; }
+  .campo input:focus, .campo textarea:focus { outline: none; border-color: var(--amber); }
+
+  .botao-principal {
+    width: 100%; padding: 12px; border: none; border-radius: 3px; background: var(--amber);
+    color: #201A12; font-weight: 600; text-transform: uppercase; letter-spacing: .04em;
+    cursor: pointer; font-size: 13px;
+  }
+  .botao-principal:hover { filter: brightness(1.08); }
+  .botao-fantasma {
+    background: none; border: 1px solid var(--line); color: var(--muted);
+    padding: 8px 14px; border-radius: 3px; cursor: pointer; font-size: 12.5px;
+  }
+  .botao-fantasma-pequeno {
+    background: none; border: 1px solid var(--line); color: var(--muted);
+    padding: 5px 10px; border-radius: 3px; cursor: pointer; font-size: 11.5px; margin: 6px 6px 0 0;
+  }
+
+  .abas { display: flex; gap: 8px; margin-bottom: 16px; }
+  .aba { flex: 1; padding: 9px; border-radius: 3px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); cursor: pointer; font-size: 12.5px; }
+  .aba.ativa { border-color: var(--amber); color: var(--amber); }
+
+  .alternancia { display: flex; gap: 8px; }
+  .opcao { flex: 1; padding: 9px; border-radius: 3px; border: 1px solid var(--line); background: var(--bg); color: var(--muted); cursor: pointer; font-size: 12.5px; }
+  .opcao.ativa-ok { border-color: var(--teal); color: var(--teal); background: rgba(70,179,157,.08); }
+  .opcao.ativa-fail { border-color: var(--red); color: var(--red); background: rgba(229,83,61,.08); }
+
+  .grade { display: grid; grid-template-columns: 1fr; gap: 16px; }
+  @media (min-width: 900px) { .grade { grid-template-columns: 340px 1fr; align-items: start; } }
+  .coluna-direita > .cartao + .cartao { margin-top: 16px; }
+
+  .linha-metricas { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .botao-metrica {
+    padding: 6px 11px; border-radius: 3px; border: 1px solid var(--line); background: var(--bg);
+    color: var(--muted); font-size: 11.5px; cursor: pointer; font-family: 'IBM Plex Mono', monospace; text-transform: uppercase;
+  }
+  .botao-metrica.ativa { border-color: var(--amber); color: var(--amber); }
+
+  .area-grafico { position: relative; height: 240px; }
+  .area-grafico-pizza { height: 220px; }
+  .vazio { color: var(--muted); font-size: 13px; text-align: center; padding: 30px 10px; border: 1px dashed var(--line); border-radius: 3px; }
+
+  .leituras { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-bottom: 16px; }
+  @media (min-width: 640px) { .leituras { grid-template-columns: repeat(4, 1fr); } }
+  .leitura { border: 1px solid var(--line); background: var(--bg); border-radius: 3px; padding: 10px 12px; }
+  .leitura-rotulo { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 4px; }
+  .leitura-valor { font-family: 'IBM Plex Mono', monospace; font-size: 19px; color: var(--amber); text-shadow: 0 0 8px rgba(255,150,64,.35); }
+
+  table.tabela { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  table.tabela th {
+    text-align: left; color: var(--muted); font-weight: 500; font-size: 10.5px;
+    text-transform: uppercase; letter-spacing: .04em; padding: 8px 10px; border-bottom: 1px solid var(--line);
+  }
+  table.tabela td { padding: 9px 10px; border-bottom: 1px solid var(--line); font-family: 'IBM Plex Mono', monospace; }
+  .pilula { padding: 3px 8px; border-radius: 20px; font-size: 10.5px; display: inline-flex; align-items: center; gap: 5px; font-family: 'IBM Plex Sans', sans-serif; }
+  .pilula-ok { background: rgba(70,179,157,.12); color: var(--teal); }
+  .pilula-fail { background: rgba(229,83,61,.12); color: var(--red); }
+  .ponto { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+  .excluir { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; }
+  .excluir:hover { color: var(--red); }
+
+  .alerta-erro {
+    display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--red);
+    background: rgba(229,83,61,.1); border: 1px solid rgba(229,83,61,.35); padding: 10px 14px; border-radius: 3px; margin-bottom: 14px;
+  }
+
+  .caixa-chave {
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: var(--bg);
+    border: 1px solid var(--line); border-radius: 3px; padding: 8px 10px; margin-bottom: 6px;
+  }
+  .caixa-chave code { font-family: 'IBM Plex Mono', monospace; color: var(--amber); font-size: 12.5px; word-break: break-all; }
+  .separador { height: 1px; background: var(--line); margin: 18px 0; }
+
+  .camera-caixa { border: 1px dashed var(--line); border-radius: 3px; padding: 10px; }
+  .camera-video { width: 100%; max-height: 220px; border-radius: 3px; background: #000; display: block; margin-bottom: 8px; object-fit: cover; }
+  .camera-status { font-size: 12px; color: var(--muted); }
+  .camera-leituras { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .camera-leituras strong { color: var(--amber); font-family: 'IBM Plex Mono', monospace; }
+
+  [hidden] { display: none !important; }
+
+  button:focus-visible, input:focus-visible, textarea:focus-visible {
+    outline: 2px solid var(--amber); outline-offset: 2px;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="topbar">
+    <div class="marca">
+      <div>
+        <h1>Monitor de Testes — Retardante de Chamas</h1>
+        <p class="subtitulo" id="subtitulo-topo">Leituras do sensor óptico · registro e comparação de testes de fogo</p>
+      </div>
+    </div>
+    <button id="botao-sair" class="botao-fantasma" hidden>Sair</button>
+  </div>
+
+  <div id="erro-global" class="alerta-erro" hidden></div>
+
+  <main>
+    <section id="tela-api" class="tela cartao cartao-estreito">
+      <div class="rotulo-painel">Conectar ao servidor</div>
+      <p class="texto-auxiliar">Informe o endereço da API do backend (ex.: https://sua-api.exemplo.com). Você pode trocar depois recarregando a página.</p>
+      <form id="form-api">
+        <div class="campo">
+          <label for="campo-api-url">Endereço da API</label>
+          <input type="url" id="campo-api-url" placeholder="https://sua-api.exemplo.com" required />
+        </div>
+        <button type="submit" class="botao-principal">Continuar</button>
+      </form>
+    </section>
+
+    <section id="tela-auth" class="tela cartao cartao-estreito" hidden>
+      <div class="abas">
+        <button type="button" class="aba ativa" data-aba="login">Entrar</button>
+        <button type="button" class="aba" data-aba="cadastro">Criar conta</button>
+      </div>
+
+      <form id="form-login">
+        <div class="campo">
+          <label for="login-email">Email</label>
+          <input type="email" id="login-email" required />
+        </div>
+        <div class="campo">
+          <label for="login-senha">Senha</label>
+          <input type="password" id="login-senha" required />
+        </div>
+        <button type="submit" class="botao-principal">Entrar</button>
+      </form>
+
+      <form id="form-cadastro" hidden>
+        <div class="campo">
+          <label for="cad-nome">Nome</label>
+          <input type="text" id="cad-nome" required />
+        </div>
+        <div class="campo">
+          <label for="cad-email">Email</label>
+          <input type="email" id="cad-email" required />
+        </div>
+        <div class="campo">
+          <label for="cad-senha">Senha (mín. 8 caracteres)</label>
+          <input type="password" id="cad-senha" minlength="8" required />
+        </div>
+        <button type="submit" class="botao-principal">Criar conta</button>
+      </form>
+    </section>
+
+    <section id="tela-painel" class="tela" hidden>
+      <div class="grade">
+        <div class="cartao">
+          <div class="rotulo-painel">Novo teste</div>
+          <form id="form-teste">
+            <div class="campo">
+              <label for="t-amostra">Amostra / produto</label>
+              <input type="text" id="t-amostra" placeholder="ex.: Lote 12 - Formulação B" required />
+            </div>
+            <div class="campo">
+              <label for="t-data">Data do teste</label>
+              <input type="date" id="t-data" required />
+            </div>
+
+            <div class="campo">
+              <label>Captura pela câmera (opcional)</label>
+              <div class="camera-caixa">
+                <video id="video-camera" class="camera-video" autoplay playsinline muted hidden></video>
+                <canvas id="canvas-camera" hidden></canvas>
+                <div class="camera-status" id="camera-status">Câmera desligada.</div>
+                <div class="camera-leituras" id="camera-leituras" hidden>
+                  <span>Intensidade atual: <strong id="camera-intensidade-atual">0%</strong></span>
+                  <span>Pico: <strong id="camera-pico">0%</strong></span>
+                  <span>Tempo: <strong id="camera-tempo">0.0s</strong></span>
+                </div>
+                <div style="margin-top:8px;">
+                  <button type="button" id="botao-camera" class="botao-fantasma-pequeno">Iniciar teste com a câmera</button>
+                </div>
+                <p class="texto-auxiliar" style="margin-top:8px;">A câmera estima a intensidade pela cor/brilho da imagem e mede o tempo até a chama sumir da tela. Ela não mede temperatura — esse campo continua manual. Funciona melhor com boa iluminação, apontando direto para a chama.</p>
+              </div>
+            </div>
+
+            <div class="campo">
+              <label for="t-intensidade">Intensidade da chama (%)</label>
+              <input type="number" step="0.1" min="0" id="t-intensidade" placeholder="leitura do sensor óptico" />
+            </div>
+            <div class="campo">
+              <label for="t-temperatura">Temperatura máxima (°C)</label>
+              <input type="number" step="0.1" id="t-temperatura" />
+            </div>
+            <div class="campo">
+              <label for="t-tempo">Tempo até autoextinção (s)</label>
+              <input type="number" step="0.1" min="0" id="t-tempo" />
+            </div>
+            <div class="campo">
+              <label>Resultado</label>
+              <div class="alternancia">
+                <button type="button" class="opcao ativa-ok" data-resultado="Aprovado">Aprovado</button>
+                <button type="button" class="opcao" data-resultado="Reprovado">Reprovado</button>
+              </div>
+            </div>
+            <div class="campo">
+              <label for="t-obs">Observações</label>
+              <textarea id="t-obs" placeholder="condições do teste, notas..."></textarea>
+            </div>
+            <button type="submit" class="botao-principal">Registrar teste</button>
+          </form>
+
+          <div class="separador"></div>
+
+          <div class="rotulo-painel">Chave de API do sensor</div>
+          <p class="texto-auxiliar">Configure esta chave no dispositivo do sensor óptico para que ele envie as leituras automaticamente.</p>
+          <div class="caixa-chave">
+            <code id="valor-chave">••••••••••••••••</code>
+          </div>
+          <button type="button" id="botao-mostrar-chave" class="botao-fantasma-pequeno">Mostrar</button>
+          <button type="button" id="botao-copiar-chave" class="botao-fantasma-pequeno">Copiar</button>
+          <button type="button" id="botao-regenerar-chave" class="botao-fantasma-pequeno">Gerar nova chave</button>
+        </div>
+
+        <div class="coluna-direita">
+          <div class="cartao">
+            <div class="rotulo-painel">Comparativo por métrica — gráfico de coluna</div>
+            <div class="linha-metricas" id="linha-metricas">
+              <button type="button" class="botao-metrica ativa" data-metrica="tempoExtincao">t. extinção</button>
+              <button type="button" class="botao-metrica" data-metrica="intensidade">intensidade</button>
+              <button type="button" class="botao-metrica" data-metrica="temperatura">temperatura</button>
+            </div>
+            <div class="area-grafico"><canvas id="grafico-coluna"></canvas></div>
+            <p id="vazio-coluna" class="vazio" hidden>Nenhum teste registrado ainda.</p>
+          </div>
+
+          <div class="cartao">
+            <div class="rotulo-painel">Aprovado × reprovado — gráfico de setor</div>
+            <div class="area-grafico area-grafico-pizza"><canvas id="grafico-pizza"></canvas></div>
+            <p id="vazio-pizza" class="vazio" hidden>Sem dados suficientes ainda.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="cartao" style="margin-top:16px;">
+        <div class="rotulo-painel">Relatório — log de testes</div>
+        <div class="leituras" id="leituras"></div>
+        <div style="overflow-x:auto;">
+          <table class="tabela" id="tabela-testes">
+            <thead>
+              <tr><th>Amostra</th><th>Data</th><th>Intensidade</th><th>Temp. máx</th><th>T. extinção</th><th>Resultado</th><th></th></tr>
+            </thead>
+            <tbody id="corpo-tabela"></tbody>
+          </table>
+        </div>
+        <p id="vazio-tabela" class="vazio" hidden>Nenhum teste no log ainda.</p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var estado = {
+    apiBase: '',
+    token: null,
+    usuario: null,
+    testes: [],
+    metrica: 'tempoExtincao',
+    resultadoSelecionado: 'Aprovado',
+    chaveApi: '',
+    chaveVisivel: false,
+  };
+
+  var graficoColuna = null;
+  var graficoPizza = null;
+
+  var streamCamera = null;
+  var gravando = false;
+  var inicioGravacao = 0;
+  var picoIntensidade = 0;
+  var ultimoInstanteComChama = 0;
+  var intervaloAmostragem = null;
+  var LIMIAR_CHAMA = 4;
+  var ATRASO_CONFIRMACAO_MS = 2000;
+
+  function $(sel) { return document.querySelector(sel); }
+  function $all(sel) { return document.querySelectorAll(sel); }
+
+  function mostrarTela(id) {
+    $all('.tela').forEach(function (el) { el.hidden = true; });
+    $('#' + id).hidden = false;
+  }
+
+  function mostrarErro(msg) {
+    var el = $('#erro-global');
+    el.textContent = msg;
+    el.hidden = false;
+    setTimeout(function () { el.hidden = true; }, 6000);
+  }
+
+  function escapar(texto) {
+    var div = document.createElement('div');
+    div.textContent = texto == null ? '' : texto;
+    return div.innerHTML;
+  }
+
+  function chamarApi(caminho, opcoes) {
+    opcoes = opcoes || {};
+    var cabecalhos = Object.assign(
+      { 'Content-Type': 'application/json' },
+      estado.token ? { Authorization: 'Bearer ' + estado.token } : {},
+      opcoes.headers || {}
+    );
+    return fetch(estado.apiBase + caminho, Object.assign({}, opcoes, { headers: cabecalhos }))
+      .then(function (resposta) {
+        return resposta.json().catch(function () { return {}; }).then(function (dados) {
+          if (!resposta.ok) throw new Error(dados.erro || ('Erro na requisição (' + resposta.status + ').'));
+          return dados;
+        });
+      });
+  }
+
+  // Tela: endereço da API
+  $('#form-api').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var url = $('#campo-api-url').value.trim().replace(/\/+$/, '');
+    if (!url) return;
+    estado.apiBase = url;
+    $('#subtitulo-topo').textContent = 'Conectado a ' + url;
+    mostrarTela('tela-auth');
+  });
+
+  // Tela: login / cadastro
+  $all('.aba').forEach(function (botao) {
+    botao.addEventListener('click', function () {
+      $all('.aba').forEach(function (b) { b.classList.remove('ativa'); });
+      botao.classList.add('ativa');
+      var aba = botao.dataset.aba;
+      $('#form-login').hidden = aba !== 'login';
+      $('#form-cadastro').hidden = aba !== 'cadastro';
+    });
+  });
+
+  $('#form-login').addEventListener('submit', function (e) {
+    e.preventDefault();
+    chamarApi('/api/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email: $('#login-email').value.trim(), senha: $('#login-senha').value }),
+    }).then(entrarNoPainel).catch(function (erro) { mostrarErro(erro.message); });
+  });
+
+  $('#form-cadastro').addEventListener('submit', function (e) {
+    e.preventDefault();
+    chamarApi('/api/auth/registrar', {
+      method: 'POST',
+      body: JSON.stringify({
+        nome: $('#cad-nome').value.trim(),
+        email: $('#cad-email').value.trim(),
+        senha: $('#cad-senha').value,
+      }),
+    }).then(entrarNoPainel).catch(function (erro) { mostrarErro(erro.message); });
+  });
+
+  function entrarNoPainel(dados) {
+    estado.token = dados.token;
+    estado.usuario = dados.usuario;
+    if (dados.apiKey) estado.chaveApi = dados.apiKey;
+    $('#botao-sair').hidden = false;
+    mostrarTela('tela-painel');
+    carregarChave();
+    carregarTudo();
+  }
+
+  $('#botao-sair').addEventListener('click', function () {
+    estado.token = null;
+    estado.usuario = null;
+    estado.testes = [];
+    estado.chaveApi = '';
+    estado.chaveVisivel = false;
+    $('#botao-sair').hidden = true;
+    mostrarTela('tela-auth');
+  });
+
+  // Chave de API
+  function carregarChave() {
+    if (estado.chaveApi) { renderizarChave(); return; }
+    chamarApi('/api/auth/minha-chave').then(function (dados) {
+      estado.chaveApi = dados.apiKey;
+      renderizarChave();
+    }).catch(function () {});
+  }
+
+  function renderizarChave() {
+    $('#valor-chave').textContent = estado.chaveVisivel ? estado.chaveApi : '••••••••••••••••';
+  }
+
+  $('#botao-mostrar-chave').addEventListener('click', function () {
+    estado.chaveVisivel = !estado.chaveVisivel;
+    $('#botao-mostrar-chave').textContent = estado.chaveVisivel ? 'Ocultar' : 'Mostrar';
+    renderizarChave();
+  });
+
+  $('#botao-copiar-chave').addEventListener('click', function () {
+    if (!navigator.clipboard) { mostrarErro('Copie a chave manualmente.'); return; }
+    navigator.clipboard.writeText(estado.chaveApi).then(function () {
+      var botao = $('#botao-copiar-chave');
+      var textoAntigo = botao.textContent;
+      botao.textContent = 'Copiado!';
+      setTimeout(function () { botao.textContent = textoAntigo; }, 1500);
+    }).catch(function () { mostrarErro('Não foi possível copiar automaticamente. Copie manualmente.'); });
+  });
+
+  $('#botao-regenerar-chave').addEventListener('click', function () {
+    chamarApi('/api/auth/regenerar-chave', { method: 'POST' }).then(function (dados) {
+      estado.chaveApi = dados.apiKey;
+      estado.chaveVisivel = true;
+      $('#botao-mostrar-chave').textContent = 'Ocultar';
+      renderizarChave();
+    }).catch(function (erro) { mostrarErro(erro.message); });
+  });
+
+  // Novo teste
+  $all('.opcao[data-resultado]').forEach(function (botao) {
+    botao.addEventListener('click', function () {
+      estado.resultadoSelecionado = botao.dataset.resultado;
+      $all('.opcao[data-resultado]').forEach(function (b) { b.classList.remove('ativa-ok', 'ativa-fail'); });
+      botao.classList.add(botao.dataset.resultado === 'Aprovado' ? 'ativa-ok' : 'ativa-fail');
+    });
+  });
+
+  function alternarCamera() {
+    if (!gravando) { iniciarGravacao(); } else { pararGravacao(true); }
+  }
+
+  function iniciarGravacao() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      mostrarErro('Este navegador não permite acesso à câmera.');
+      return;
+    }
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+      .then(function (stream) {
+        streamCamera = stream;
+        var video = $('#video-camera');
+        video.srcObject = stream;
+        video.hidden = false;
+        $('#camera-leituras').hidden = false;
+        $('#camera-status').textContent = 'Gravando...';
+        $('#botao-camera').textContent = 'Parar gravação';
+        gravando = true;
+        inicioGravacao = performance.now();
+        ultimoInstanteComChama = inicioGravacao;
+        picoIntensidade = 0;
+        $('#camera-pico').textContent = '0%';
+        intervaloAmostragem = setInterval(amostrarQuadro, 200);
+      })
+      .catch(function () {
+        mostrarErro('Não foi possível acessar a câmera. Verifique as permissões do navegador.');
+      });
+  }
+
+  function amostrarQuadro() {
+    var video = $('#video-camera');
+    var canvas = $('#canvas-camera');
+    if (!video.videoWidth) return;
+    var LARGURA = 48, ALTURA = 36;
+    canvas.width = LARGURA; canvas.height = ALTURA;
+    var ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, LARGURA, ALTURA);
+    var quadro = ctx.getImageData(0, 0, LARGURA, ALTURA).data;
+    var pixelsChama = 0;
+    var totalPixels = LARGURA * ALTURA;
+    for (var i = 0; i < quadro.length; i += 4) {
+      var r = quadro[i], g = quadro[i + 1], b = quadro[i + 2];
+      var brilho = (r + g + b) / 3;
+      var pareceChama = r > 150 && (r - b) > 40 && r >= g && brilho > 60 && brilho < 250;
+      if (pareceChama) pixelsChama++;
+    }
+    var intensidadeAtual = (pixelsChama / totalPixels) * 100;
+    $('#camera-intensidade-atual').textContent = intensidadeAtual.toFixed(1) + '%';
+
+    var agora = performance.now();
+    if (intensidadeAtual >= LIMIAR_CHAMA) ultimoInstanteComChama = agora;
+    if (intensidadeAtual > picoIntensidade) {
+      picoIntensidade = intensidadeAtual;
+      $('#camera-pico').textContent = picoIntensidade.toFixed(1) + '%';
+    }
+    $('#camera-tempo').textContent = ((agora - inicioGravacao) / 1000).toFixed(1) + 's';
+
+    var semChamaHaTempo = agora - ultimoInstanteComChama;
+    var duracaoTotal = agora - inicioGravacao;
+    if (duracaoTotal > 1500 && semChamaHaTempo > ATRASO_CONFIRMACAO_MS) {
+      pararGravacao(false);
+    }
+  }
+
+  function pararGravacao(manual) {
+    if (!gravando) return;
+    gravando = false;
+    clearInterval(intervaloAmostragem);
+    var agora = performance.now();
+    var tempoExtincaoCalculado = manual
+      ? (agora - inicioGravacao) / 1000
+      : (ultimoInstanteComChama - inicioGravacao) / 1000;
+
+    if (streamCamera) {
+      streamCamera.getTracks().forEach(function (t) { t.stop(); });
+      streamCamera = null;
+    }
+    $('#video-camera').hidden = true;
+    $('#botao-camera').textContent = 'Iniciar teste com a câmera';
+    $('#camera-status').textContent = manual
+      ? 'Gravação parada manualmente.'
+      : 'Chama não detectada mais na imagem — gravação encerrada automaticamente.';
+
+    $('#t-intensidade').value = picoIntensidade.toFixed(1);
+    $('#t-tempo').value = Math.max(tempoExtincaoCalculado, 0).toFixed(1);
+  }
+
+  $('#botao-camera').addEventListener('click', alternarCamera);
+
+  $('#form-teste').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var corpo = {
+      amostra: $('#t-amostra').value.trim(),
+      data: $('#t-data').value,
+      intensidade: Number($('#t-intensidade').value) || 0,
+      temperatura: Number($('#t-temperatura').value) || 0,
+      tempoExtincao: Number($('#t-tempo').value) || 0,
+      resultado: estado.resultadoSelecionado,
+      observacoes: $('#t-obs').value.trim(),
+    };
+    chamarApi('/api/testes', { method: 'POST', body: JSON.stringify(corpo) }).then(function () {
+      $('#form-teste').reset();
+      estado.resultadoSelecionado = 'Aprovado';
+      $all('.opcao[data-resultado]').forEach(function (b) { b.classList.remove('ativa-ok', 'ativa-fail'); });
+      $('.opcao[data-resultado="Aprovado"]').classList.add('ativa-ok');
+      return carregarTudo();
+    }).catch(function (erro) { mostrarErro(erro.message); });
+  });
+
+  // Métrica do gráfico de coluna
+  $all('.botao-metrica').forEach(function (botao) {
+    botao.addEventListener('click', function () {
+      estado.metrica = botao.dataset.metrica;
+      $all('.botao-metrica').forEach(function (b) { b.classList.remove('ativa'); });
+      botao.classList.add('ativa');
+      renderizarGraficoColuna();
+    });
+  });
+
+  function carregarTudo() {
+    return chamarApi('/api/testes').then(function (testes) {
+      estado.testes = testes;
+      renderizarLeituras();
+      renderizarTabela();
+      renderizarGraficoColuna();
+      renderizarGraficoPizza();
+    }).catch(function (erro) { mostrarErro(erro.message); });
+  }
+
+  function excluirTeste(id) {
+    chamarApi('/api/testes/' + id, { method: 'DELETE' }).then(carregarTudo).catch(function (erro) { mostrarErro(erro.message); });
+  }
+
+  function renderizarLeituras() {
+    var total = estado.testes.length;
+    var aprovados = estado.testes.filter(function (t) { return t.resultado === 'Aprovado'; }).length;
+    var taxa = total ? Math.round((aprovados / total) * 100) : 0;
+    function media(campo) {
+      if (!total) return '0.0';
+      var soma = estado.testes.reduce(function (s, t) { return s + Number(t[campo]); }, 0);
+      return (soma / total).toFixed(1);
+    }
+    $('#leituras').innerHTML =
+      '<div class="leitura"><div class="leitura-rotulo">Total de testes</div><div class="leitura-valor">' + total + '</div></div>' +
+      '<div class="leitura"><div class="leitura-rotulo">Taxa de aprovação</div><div class="leitura-valor">' + taxa + '%</div></div>' +
+      '<div class="leitura"><div class="leitura-rotulo">Intensidade média</div><div class="leitura-valor">' + media('intensidade') + '%</div></div>' +
+      '<div class="leitura"><div class="leitura-rotulo">T. extinção média</div><div class="leitura-valor">' + media('tempoExtincao') + 's</div></div>';
+  }
+
+  function renderizarTabela() {
+    var corpo = $('#corpo-tabela');
+    var vazio = $('#vazio-tabela');
+    if (estado.testes.length === 0) {
+      corpo.innerHTML = '';
+      vazio.hidden = false;
+      return;
+    }
+    vazio.hidden = true;
+    corpo.innerHTML = estado.testes.map(function (t) {
+      return '<tr>' +
+        '<td>' + escapar(t.amostra) + '</td>' +
+        '<td>' + escapar(t.data) + '</td>' +
+        '<td>' + t.intensidade + '%</td>' +
+        '<td>' + t.temperatura + '°C</td>' +
+        '<td>' + t.tempoExtincao + 's</td>' +
+        '<td><span class="pilula ' + (t.resultado === 'Aprovado' ? 'pilula-ok' : 'pilula-fail') + '"><span class="ponto"></span>' + t.resultado + '</span></td>' +
+        '<td><button class="excluir" data-id="' + t.id + '" title="Excluir">✕</button></td>' +
+        '</tr>';
+    }).join('');
+
+    $all('.excluir').forEach(function (botao) {
+      botao.addEventListener('click', function () { excluirTeste(botao.dataset.id); });
+    });
+  }
+
+  function renderizarGraficoColuna() {
+    var canvas = $('#grafico-coluna');
+    var vazio = $('#vazio-coluna');
+    if (estado.testes.length === 0) {
+      if (graficoColuna) { graficoColuna.destroy(); graficoColuna = null; }
+      canvas.style.display = 'none';
+      vazio.hidden = false;
+      return;
+    }
+    vazio.hidden = true;
+    canvas.style.display = 'block';
+
+    var labels = estado.testes.map(function (t) { return t.amostra; });
+    var valores = estado.testes.map(function (t) { return Number(t[estado.metrica]); });
+    var cores = estado.testes.map(function (t) { return t.resultado === 'Aprovado' ? '#46B39D' : '#E5533D'; });
+
+    if (graficoColuna) graficoColuna.destroy();
+    graficoColuna = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: { labels: labels, datasets: [{ data: valores, backgroundColor: cores, borderRadius: 4, maxBarThickness: 40 }] },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#9A9186', font: { size: 11 } }, grid: { color: '#443C32' } },
+          y: { ticks: { color: '#9A9186', font: { size: 11 } }, grid: { color: '#443C32' }, beginAtZero: true },
+        },
+      },
+    });
+  }
+
+  function renderizarGraficoPizza() {
+    var canvas = $('#grafico-pizza');
+    var vazio = $('#vazio-pizza');
+    var total = estado.testes.length;
+    if (total === 0) {
+      if (graficoPizza) { graficoPizza.destroy(); graficoPizza = null; }
+      canvas.style.display = 'none';
+      vazio.hidden = false;
+      return;
+    }
+    vazio.hidden = true;
+    canvas.style.display = 'block';
+
+    var aprovados = estado.testes.filter(function (t) { return t.resultado === 'Aprovado'; }).length;
+    var reprovados = total - aprovados;
+
+    if (graficoPizza) graficoPizza.destroy();
+    graficoPizza = new Chart(canvas.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Aprovado', 'Reprovado'],
+        datasets: [{ data: [aprovados, reprovados], backgroundColor: ['#46B39D', '#E5533D'], borderWidth: 0 }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { color: '#9A9186', font: { size: 11 } } } },
+      },
+    });
+  }
+});
+</script>
+</body>
+</html>
